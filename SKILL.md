@@ -1,7 +1,7 @@
 ---
-version: "1.1.0"
+version: "1.2.0"
 name: social-media-posting
-description: "Cross-platform social media content creation, posting, and engagement skill. Covers Instagram, LinkedIn, X/Twitter, Threads, YouTube, TikTok, Reddit, dev.to, Facebook, Discord, and Telegram. Handles AI image generation with mandatory real-logo / brand-fidelity workflow (Nano Banana Pro with 3 options per image at correct aspect ratios, real official logos passed as image_input references), AI video generation (Veo 3.1), carousel creation, platform-specific posting flows, deduplication against recent posts, strategic content planning (hook formulas, psychological angles, content pillars), brand context integration, proof screenshot creation for virality, and daily engagement (replying to 10 threads per platform). Use this skill whenever the user wants to post content to social media, create social media visuals, schedule posts, engage with followers, grow their audience, reply to threads, or manage any social media activity. Also activate when the user mentions any social platform by name, says 'post this', 'share on social', 'engage', 'reply to threads', 'publish a post about', 'social media blast', 'cross-post this', 'announce on social', 'spread the word', 'promote this on', 'quick post', 'post with video', 'create social content for', 'repost across socials', or references content distribution."
+description: "Cross-platform social media content creation, posting, and engagement skill with explicit per-post approval, GPT Image 2 (text-rendering default), Seedance 2.0 video, and real-people photo workflow. Covers Instagram, LinkedIn, X/Twitter, Threads, YouTube, TikTok, Reddit, dev.to, Facebook, Discord, and Telegram. Handles AI image generation with mandatory real-logo / brand-fidelity workflow (GPT Image 2 default for text-bearing slides, Nano Banana Pro fallback for text-free hero shots, 3 options per image at correct aspect ratios, real official logos and real public-figure photos passed as image_input references), AI video generation (Seedance 2.0 default with native audio, Veo 3 Fast fallback), carousel creation (8-12 slide storyboards for IG/TikTok), platform-specific posting flows, deduplication against recent posts, strategic content planning (hook formulas, psychological angles, content pillars), brand context integration, proof screenshot creation for virality, and daily engagement (replying to 10 threads per platform). Use this skill whenever the user wants to post content to social media, create social media visuals, schedule posts, engage with followers, grow their audience, reply to threads, or manage any social media activity. Also activate when the user mentions any social platform by name, says 'post this', 'share on social', 'engage', 'reply to threads', 'publish a post about', 'social media blast', 'cross-post this', 'announce on social', 'spread the word', 'promote this on', 'quick post', 'post with video', 'create social content for', 'repost across socials', or references content distribution."
 repository: anton-abyzov/social-media-posting-skill
 metadata:
   tags: social-media, instagram, linkedin, twitter, threads, youtube, tiktok, reddit, discord, telegram, posting, engagement, automation, image-generation, content-creation, copywriting, publishing, video-generation, veo, brand-fidelity, real-logos
@@ -42,15 +42,54 @@ Before writing any content, gather context:
 
 ### 1. NEVER Post Without Approval
 
-Every piece of content -- posts, comments, replies -- must be shown to you first. The workflow is always:
+**All posts must go through the user's approval. The agent MUST explicitly ask the user to confirm every post.**
+
+Every piece of content -- posts, comments, replies -- must be shown to the user first AND each individual post must receive its own explicit confirmation before it goes live. The workflow is always:
 
 1. **Draft** the content (text + images)
-2. **Present** it for review with a clear summary
-3. **Wait** for explicit "go ahead" / "approved" / "post it"
-4. **Post** only after approval
+2. **Present** it for review with a clear summary (see sub-rule 1a for the required template)
+3. **Wait** for explicit, unambiguous approval — the per-post confirmation prompt
+4. **Post** only after that explicit approval
 5. **Verify** the post is live and report the URL
 
-This exists because social media is public, permanent, and tied to your reputation. A bad post can't be unseen. The cost of waiting 30 seconds for approval is nothing compared to the cost of posting something wrong.
+This exists because social media is public, permanent, and tied to the user's reputation. A bad post can't be unseen. The cost of waiting 30 seconds for approval is nothing compared to the cost of posting something wrong.
+
+**Hard requirements — read carefully, all of these are non-negotiable:**
+
+- **Per-post confirmation, one by one — never in batches.** The agent MUST explicitly ask for confirmation before EVERY post. Do not bundle 5 posts into a single "approve all?" prompt. Even when the platforms are similar and the content is similar, each platform/account/post pair gets its own confirmation prompt.
+- **Campaign approval ≠ post approval.** Even if the user has approved the overall plan, content calendar, or campaign strategy, each individual post still requires a fresh confirmation prompt. "I approve the launch campaign" does NOT authorize the agent to start publishing — it authorizes the agent to start drafting and presenting individual posts for per-post approval.
+- **Confirmation must include the full picture.** Every confirmation prompt must list: target platform, target account/handle, scheduled time (or "now"), the full post text, and the media (image/video) being attached. The user cannot consent to what they cannot see.
+- **Ambiguous responses are NOT explicit approval.** "Looks good", "sure", "ok", "fine", "yeah", a thumbs-up emoji — these are NOT approval. Require an unambiguous "publish", "yes, publish to X", "go ahead with platform Y", "post it to Instagram now", or equivalent. If the user's response is ambiguous, treat it as a NO and re-ask: *"To confirm — should I publish this to Instagram (@aabyzov) right now? Reply 'publish' to push it live or 'no' to hold."*
+- **Stale schedules still require confirmation.** If the user has scheduled a post and the scheduled time has passed (i.e., the agent missed the window), the agent must STILL confirm before pushing it through. Do NOT auto-publish stale schedules. Surface the missed time and ask whether to publish now, reschedule, or skip.
+- **Auto mode does NOT override this rule.** Even when "auto mode" is active in Claude Code, every post still requires per-post explicit confirmation. Auto mode means "act decisively on routine work without asking" — it does NOT mean "publish to the user's social accounts without asking". Posting to social media is not routine work; it is irreversible public output and is explicitly excluded from auto mode's grant.
+- **Never queue multiple posts to publish without per-post confirmation.** If the user wants to schedule a series, the agent presents one post at a time, gets approval for each, and only then queues that single post. The agent does NOT load up a queue of 10 unconfirmed posts and run them.
+- **Deletions and replacements of already-published posts also require explicit confirmation.** Before the agent deletes or replaces a post that is currently live, it MUST confirm: *"Shall I delete the YouTube Short that's currently live at <URL> and repost with the new video?"* Treat this with the same rigor as initial publication, because it is just as irreversible (and for replacements, doubly so — the agent is performing a delete plus a publish in one step).
+
+#### 1a. Per-post confirmation pattern
+
+When the agent is ready to publish a post, it must use this template (or a near-equivalent that contains all the same fields). The agent MUST NOT call any posting tool until the user has replied with an unambiguous publish instruction.
+
+```
+Ready to publish:
+  Platform: Instagram (@aabyzov)
+  Time: now (was 7:00 PM EDT, missed)
+  Text: [first 200 chars + "…"]
+  Media: 11-slide carousel — slide URLs listed below
+Reply "publish" to push, "edit" to change something, "skip" to cancel.
+```
+
+Variations are fine (the platform, account, time, text preview, and media block must all be present), but the response options must remain clear: a publish word, an edit word, and a skip/cancel word. If the user replies with anything else (a question, a clarification, or an ambiguous affirmative), do NOT publish — answer the question or re-prompt for an unambiguous answer.
+
+For deletions/replacements, adapt the template:
+
+```
+Ready to delete + replace:
+  Platform: YouTube (@aabyzov)
+  Currently live: <URL of post being replaced>
+  New media: <description of the new video / image>
+  New caption: [first 200 chars + "…"]
+Reply "replace" to delete the old post and publish the new one, "edit" to change something, "skip" to cancel.
+```
 
 ### 2. Always Generate Images
 
@@ -155,9 +194,99 @@ These URLs have been confirmed to return real PNG/SVG image data and are reachab
 | OpenAI | `https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/OpenAI_Logo.svg/1280px-OpenAI_Logo.svg.png` | PNG |
 | AWS | `https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/1280px-Amazon_Web_Services_Logo.svg.png` | PNG |
 | xAI | `https://logos-world.net/wp-content/uploads/2023/07/xAI-Logo.png` | PNG |
-| Anthropic | `https://upload.wikimedia.org/wikipedia/commons/7/78/Anthropic_logo.svg` | SVG (convert with svglib if PNG required) |
+| Anthropic | `https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/67d31dd7aa394792257596c5_webclip.png` | PNG (256×256, geometric A\ symbol mark — apple-touch-icon from anthropic.com) |
+| Anthropic (wordmark, AVOID for small/medium renders) | `https://upload.wikimedia.org/wikipedia/commons/7/78/Anthropic_logo.svg` | SVG — wordmark stylizes the I as a diagonal stroke; at carousel sizes it reads as "ANTHROP\C". Use the geometric A\ symbol mark above instead and render the word "Anthropic" as plain editorial text in the prompt. |
 
-**Convention for new entries:** when you research a new brand's logo, after the post ships and the logo proved usable, edit this section and add the row. Note the format and any quirks (transparent vs solid background, color vs monochrome variant). This turns the skill into a living brand library.
+**Anthropic-specific guidance:** Anthropic's wordmark stylizes the I as a diagonal stroke, so when rendered at small or medium sizes in carousels it reads as "ANTHROP\C" — visibly broken. The fix is to **always pass the geometric A\ symbol mark (the apple-touch-icon webclip PNG) instead of the SVG wordmark**, and render the word "Anthropic" as plain editorial text in the prompt rather than relying on the supplied logo to do it.
+
+**Convention for new entries:** when you research a new brand's logo, after the post ships and the logo proved usable, edit this section and add the row. Note the format and any quirks (transparent vs solid background, color vs monochrome variant, small-size rendering issues). This turns the skill into a living brand library.
+
+---
+
+## Real People in Generated Visuals
+
+When the story involves real public figures (CEOs, founders, well-known executives, recognizable industry voices), the same brand-fidelity rule applies: do NOT let the generator invent a face. Hallucinated faces that "look like" Sam Altman or Satya Nadella but aren't them are off-brand AI slop and a hard regeneration trigger.
+
+### a) Fetch a real photograph
+
+Before any image-gen call that depicts a real public figure, **fetch a real photograph of the person** from Wikimedia Commons or the relevant brand portal. Pass it via `image_input` to GPT Image 2 (or whichever generator is being used) with the explicit prompt clause:
+
+> *"Use the supplied reference photograph verbatim — preserve their actual face, do not stylize, do not invent features. The person in the rendered image must be visually identifiable as the real public figure."*
+
+### b) Wikimedia URL pattern that ACTUALLY WORKS
+
+Use the **direct file URL pattern**, not the `thumb/` paths:
+
+```
+https://upload.wikimedia.org/wikipedia/commons/<a>/<bc>/<File_Name>.jpg
+```
+
+The `thumb/` paths return HTML on direct curl from Kie.ai's servers and silently fail. Always validate the response is a real image with `file <path>` showing `JPEG image data` or `PNG image` before trusting it.
+
+### c) Verified person URL reference table
+
+These URLs have been confirmed to return real JPEG/PNG image data and are reachable from Kie.ai's servers. **Append to this table every time the workflow encounters a new public figure whose photograph had to be researched** — the same convention as the Verified Logo URL Reference Table above.
+
+| Person | URL | Format |
+|--------|-----|--------|
+| Sam Altman | `https://upload.wikimedia.org/wikipedia/commons/2/2f/Sam_Altman_speaking_at_TED_%28cropped%29.jpg` | JPEG |
+| Satya Nadella | `https://upload.wikimedia.org/wikipedia/commons/7/78/MS-Exec-Nadella-Satya-2017-08-31-22_%28cropped%29.jpg` | JPEG |
+| Elon Musk | `https://upload.wikimedia.org/wikipedia/commons/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg` | JPEG |
+| Dario Amodei | `https://upload.wikimedia.org/wikipedia/commons/9/9e/Dario_Amodei_in_2023.jpg` | JPEG |
+
+**Convention:** grow this table the same way as the Verified Logo URL table. Validate each new URL by curling it and running `file <path>` — confirm `JPEG image data` or `PNG image` before adding the row, and note any quirks (cropped vs full, year, indoor vs outdoor lighting) that influenced the choice.
+
+---
+
+## Image & Video Model Selection (Stack)
+
+Picking the right model up front matters more than tuning the prompt afterwards. The stack below is the v1.2.0 default — deviate only when there's a concrete reason and note it in the per-post prep so the next session learns from it.
+
+### Image generation
+
+- **Default text-to-image / image-to-image with text on it: Kie.AI `gpt-image-2-text-to-image` and `gpt-image-2-image-to-image`** at `https://api.kie.ai/api/v1/jobs/createTask`. GPT Image 2 renders text crisply — headlines, body copy, brand wordmarks rendered as type, slide labels — where Nano Banana Pro produces gibberish. Use it whenever a slide / poster / cover has any rendered text in the frame, which on Instagram and TikTok carousels is essentially always.
+- **Fallback for pure visuals (no text): Nano Banana Pro** (`nano-banana-pro`). Still excellent for hero / cover images that don't need readable text — moody establishing shots, abstract visuals, atmosphere pieces. Use it when the frame has zero rendered text.
+- For brand-bearing images, follow the Brand & Logo Fidelity workflow above regardless of which generator is used: pass real logos via `image_input`, validate against references, regenerate on hallucinations.
+- For real public figures in the frame, follow the Real People in Generated Visuals workflow above: pass a real photograph via `image_input` and pin it with the "preserve their actual face" clause.
+
+### Video generation
+
+- **Default video model: Kie.AI `bytedance/seedance-2`** (Seedance 2.0) at the same `/api/v1/jobs/createTask` endpoint. 1080p, 4–15s, native audio (no separate score-and-mux step), supports `first_frame_url` + `last_frame_url` for narrative arcs (image → image → video) and `reference_image_urls` for style/character consistency.
+  - **Mode constraint:** reference images and first/last-frame are mutually exclusive — pick one mode per call. If you need a narrative arc anchored to two specific images, use `first_frame_url` + `last_frame_url` and skip references. If you need style/character consistency without forcing exact start/end frames, use `reference_image_urls`.
+  - The image → image → video pattern is powerful: generate two anchor frames with GPT Image 2 (start state and end state), then hand both to Seedance 2.0 as first/last frames with a short prompt describing the transition. The result is a controlled cinematic beat instead of a guess-the-motion clip.
+- **Fallback video model: Kie.AI `veo3_fast`** when speed > quality. Use it for quick rough cuts, draft passes, or when the post is time-sensitive and a slightly less polished clip is better than a missed window.
+
+### Carousels
+
+- For carousel posts (especially Instagram + TikTok with multiple facts), prefer **multi-slide image carousels generated as separate GPT Image 2 calls** with a shared style guide injected into every prompt to keep visual continuity. See the Carousel Storyboards section below for the standard structure and the style clause to inject.
+
+---
+
+## Carousel Storyboards (IG / TikTok)
+
+For information-dense viral campaigns — explainers, news breakdowns, "who's who" pieces, before/after stories — default to **8–12 slide carousels** for Instagram and TikTok (TikTok via Blotato). Single-image posts are for atmosphere or proof; carousels are for the substance that makes people save and share.
+
+### Standard structure
+
+A reliable 10-slide skeleton (compress to 8 or expand to 12 based on density):
+
+1. **Hook (slide 1)** — the curiosity-gap headline + a stop-the-scroll visual. This is the only slide most non-followers will see. It has to earn the swipe.
+2. **History / context (slides 2–3)** — the setup. What was the world like before? Who are the players? Two slides max — viewers will swipe past more.
+3. **Conflict (slides 3–4)** — the tension. The thing that broke, the bet that was placed, the surprise that landed. Where the story actually starts.
+4. **Resolution (slides 5–6)** — the payoff. What happened, what it means, why it matters now.
+5. **Optional video (mid-carousel)** — Instagram + TikTok carousels can include a video slide. Use it when the story has a moment that's better shown than told (a demo, a clip, a transition). Place it after the conflict, before the explainer block, so the swipe momentum carries through.
+6. **Explainer slides for key entities (3 slides — one per entity)** — the "Who is X / Y / Z" block. One slide per entity, each with a big logo (real, fetched per the Brand & Logo Fidelity rules) and **4 facts** (founded year, HQ, signature product, one number that matters). This is the part that makes the carousel save-worthy — viewers come back to it.
+7. **CTA (final slide)** — follow for more, link in bio, or a direct ask. Always present, always specific.
+
+For "Who is X" slides specifically: pass the real logo as `image_input`, render the entity name as plain editorial type (do not depend on the logo asset to render the name — see the Anthropic case in the Verified Logo URL Reference Table for why), and keep the 4 facts to 5–8 words each so they fit at carousel resolution.
+
+### Style continuity
+
+Inject the same STYLE clause at the top of every slide prompt to maintain visual continuity across the carousel:
+
+> *"Editorial 1:1 Instagram-carousel slide, photorealistic, hyperreal IMAX cinematography, magazine cover quality. BIG bold sans-serif headline at top. All text rendered crisply."*
+
+Adapt the aspect-ratio language for TikTok (9:16) but keep the rest verbatim. Drift in style clause = visible drift in the finished carousel.
 
 ---
 
@@ -1634,6 +1763,13 @@ When you need deeper strategy, invoke the relevant skill:
 ---
 
 ## Changelog
+
+### 1.2.0 — 2026-05-07
+- STRENGTHENED "NEVER post without approval" — now requires explicit per-post confirmation; ambiguous "looks good" responses do NOT count; auto mode does NOT override; deletions of already-published posts also require confirmation.
+- Added Image & Video Model Selection section: GPT Image 2 default (text rendering), Seedance 2.0 default (video w/ audio), Veo 3 Fast fallback, Nano Banana Pro for text-free hero shots.
+- Added Real People in Generated Visuals workflow with verified Wikimedia URLs for Sam Altman, Satya Nadella, Elon Musk, Dario Amodei.
+- Fixed Anthropic logo guidance — use the geometric A\ symbol mark from anthropic.com webclip (256×256), render "Anthropic" wordmark as plain text via prompt instead of supplying the SVG wordmark.
+- Added Carousel Storyboards section — default to 8–12 slides for IG/TikTok, with 3-slide "Who Is X" explainer block.
 
 ### 1.1.0 — 2026-05-07
 - Added "Brand & Logo Fidelity (Non-Negotiable)" section.
