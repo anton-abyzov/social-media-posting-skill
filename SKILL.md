@@ -1,5 +1,5 @@
 ---
-version: "1.2.0"
+version: "1.2.1"
 name: social-media-posting
 description: "Cross-platform social media content creation, posting, and engagement skill with explicit per-post approval, GPT Image 2 (text-rendering default), Seedance 2.0 video, and real-people photo workflow. Covers Instagram, LinkedIn, X/Twitter, Threads, YouTube, TikTok, Reddit, dev.to, Facebook, Discord, and Telegram. Handles AI image generation with mandatory real-logo / brand-fidelity workflow (GPT Image 2 default for text-bearing slides, Nano Banana Pro fallback for text-free hero shots, 3 options per image at correct aspect ratios, real official logos and real public-figure photos passed as image_input references), AI video generation (Seedance 2.0 default with native audio, Veo 3 Fast fallback), carousel creation (8-12 slide storyboards for IG/TikTok), platform-specific posting flows, deduplication against recent posts, strategic content planning (hook formulas, psychological angles, content pillars), brand context integration, proof screenshot creation for virality, and daily engagement (replying to 10 threads per platform). Use this skill whenever the user wants to post content to social media, create social media visuals, schedule posts, engage with followers, grow their audience, reply to threads, or manage any social media activity. Also activate when the user mentions any social platform by name, says 'post this', 'share on social', 'engage', 'reply to threads', 'publish a post about', 'social media blast', 'cross-post this', 'announce on social', 'spread the word', 'promote this on', 'quick post', 'post with video', 'create social content for', 'repost across socials', or references content distribution."
 repository: anton-abyzov/social-media-posting-skill
@@ -259,6 +259,83 @@ Picking the right model up front matters more than tuning the prompt afterwards.
 ### Carousels
 
 - For carousel posts (especially Instagram + TikTok with multiple facts), prefer **multi-slide image carousels generated as separate GPT Image 2 calls** with a shared style guide injected into every prompt to keep visual continuity. See the Carousel Storyboards section below for the standard structure and the style clause to inject.
+
+---
+
+## Postiz Operational Gotchas
+
+Operational knowledge that sits ABOVE the upstream Postiz CLI skill. The CLI knows how to make calls; this section captures the quirks that bite Anton's posting workflow specifically. Read this before composing any Postiz CLI invocation.
+
+### Anton's self-hosted instance
+
+- **API URL:** `https://postiz.easychamp.com/api`
+- **API key (env):** `POSTIZ_API_KEY=6fe515311a2fa829f1f3957954bd1f7d27f1480522d044ab9f610b3c79a36540`
+- Hosted on Hetzner (Helsinki). The public Postiz API key from `kie.ai` is NOT the same — use the self-hosted key when targeting `postiz.easychamp.com`. The wrong key returns `401 Invalid API key`.
+
+### Personal vs brand integration IDs
+
+When the user says "personal accounts only", restrict to the IDs below. Brand accounts (SoothBee*, Sketchmate*, EasyChamp*) are excluded by default — only use them when the user explicitly says EasyChamp / Soothbee / Sketchmate.
+
+| Platform | Integration ID | Handle / Identifier |
+|----------|---------------|---------------------|
+| X (Anton) | `cmopgzvgv0001ouvvxgzxtvtq` | `@aabyzov` |
+| LinkedIn (Anton) | `cmopiw0jb0001outahymxmkhv` | — |
+| Instagram (Anton, `instagram-standalone`) | `cmgzh1zr20001pr261ozok9yp` | `aabyzov` |
+| YouTube (Anton AI Power) | `cmgyq88pu0001po4fdvq4fvii` | `@antonabyzov` |
+| Telegram (Anton AI Power) | `cmoqlxmmc0001ou1tcojd5pps` | `@antonaipower` |
+| Discord (EasyChamp server, used for AI news) | `cmoqm1rui0003ou1tklf1p8pf` | channel `#ai-news` id `1472307264898728181` |
+
+### Silent failures: X and Telegram
+
+When a Postiz post lands in `state: ERROR`, the public API returns `error: null, errorMessage: null`. There is no detail. Workarounds that have worked:
+
+- **X errors:** drop `made_with_ai: true` from `--settings` (sometimes triggers an unexplained error). Keep the first tweet ≤ 280 chars even if Postiz says `maxLength: 4000` (Premium-account length isn't always honored on the integration path). Drop emoji density on T1 if it still fails.
+- **Telegram errors:** strip Markdown `*bold*` asterisks from the body. Replace with plain text or rely on Telegram's auto-link. The single `*…*` syntax can fail silently. Keep one image attachment max.
+
+### No `posts:update` — delete + recreate to change schedule
+
+The Postiz CLI does not expose a way to edit a queued/scheduled post's date or content. To change a scheduled post:
+
+```
+postiz posts:delete <postId>
+postiz posts:create -c "..." -m "<url>" -s "<new-iso-date>" -i "<integration-id>"
+```
+
+### Discord requires channel ID
+
+Discord posts won't go through without `--settings '{"channel":"<channelId>"}'`. Discover channels via:
+
+```
+postiz integrations:trigger <discord-integration-id> channels
+```
+
+Pick the right channel by name, copy its `id`, pass via `--settings`.
+
+### Already-published posts cannot be deleted via Postiz
+
+Postiz only deletes posts that are still in QUEUE or DRAFT state. Once `state: PUBLISHED`, you must go to the platform's native dashboard (YouTube Studio, IG mobile app, X delete, etc.) to remove the post. **Tell the user this proactively** when you regenerate visuals AFTER publishing — don't promise to "replace" a live post when you can only "supplement" it with a new one.
+
+### Calendar UI filters channels by default
+
+When the user says "I see nothing scheduled" but the API confirms posts are in QUEUE, the cause is almost always the **Channels sidebar filter** in `https://postiz.easychamp.com/launches`. Personal channels (Anton X / LinkedIn / IG / Telegram / YouTube / Discord) are typically not enabled by default — they sit below the brand channels in the sidebar list. Tell the user to scroll the sidebar and toggle them on.
+
+### TikTok via Blotato (review-queue bypass)
+
+For TikTok specifically, prefer **Blotato API v2** over Postiz. Blotato has a working TikTok integration that bypasses TikTok's Postiz review process.
+
+- API: `https://backend.blotato.com/v2`
+- Header: `blotato-api-key: <key>`
+- Anton's TikTok account: id `40681`, username `antonabyzov`
+- Handoff: upload to Postiz → get public Postiz CDN URL → POST `/v2/media` with `{url}` to mirror to Blotato CDN → POST `/v2/posts` with the Blotato URL.
+- TikTok carousel (image post): `mediaUrls: [url1, url2, ...]` + `target.imageCoverIndex: 0`. NOT `reference_image_urls` (that's a Seedance API thing).
+- TikTok video: single `mediaUrls: [videoUrl]`. Same target schema.
+- To CHANGE a Blotato schedule: `DELETE /v2/schedules/<scheduleId>` (find it via `GET /v2/schedules`, filter by `accountId`). Schedule IDs are NOT the same as `postSubmissionId`.
+
+### Reference: see also
+
+- `Postiz on Hetzner.md` in Anton's Obsidian vault — full infra runbook
+- `Postiz creds.md` in Obsidian — login + API key
+- `Blotato API creds.md` in Obsidian — Blotato key + TikTok username table
 
 ---
 
@@ -1763,6 +1840,9 @@ When you need deeper strategy, invoke the relevant skill:
 ---
 
 ## Changelog
+
+### 1.2.1 — 2026-05-07
+- Added "Postiz Operational Gotchas" section: self-hosted Hetzner instance details, personal vs brand integration ID table, silent-failure workarounds for X (drop made_with_ai flag) and Telegram (strip Markdown asterisks), no-update-API delete+recreate pattern, Discord channel discovery, already-published deletion limitation, calendar UI sidebar-filter caveat, TikTok-via-Blotato carousel + video patterns.
 
 ### 1.2.0 — 2026-05-07
 - STRENGTHENED "NEVER post without approval" — now requires explicit per-post confirmation; ambiguous "looks good" responses do NOT count; auto mode does NOT override; deletions of already-published posts also require confirmation.
