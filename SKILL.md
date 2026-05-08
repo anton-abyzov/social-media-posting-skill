@@ -1,5 +1,5 @@
 ---
-version: "1.2.1"
+version: "1.2.2"
 name: social-media-posting
 description: "Cross-platform social media content creation, posting, and engagement skill with explicit per-post approval, GPT Image 2 (text-rendering default), Seedance 2.0 video, and real-people photo workflow. Covers Instagram, LinkedIn, X/Twitter, Threads, YouTube, TikTok, Reddit, dev.to, Facebook, Discord, and Telegram. Handles AI image generation with mandatory real-logo / brand-fidelity workflow (GPT Image 2 default for text-bearing slides, Nano Banana Pro fallback for text-free hero shots, 3 options per image at correct aspect ratios, real official logos and real public-figure photos passed as image_input references), AI video generation (Seedance 2.0 default with native audio, Veo 3 Fast fallback), carousel creation (8-12 slide storyboards for IG/TikTok), platform-specific posting flows, deduplication against recent posts, strategic content planning (hook formulas, psychological angles, content pillars), brand context integration, proof screenshot creation for virality, and daily engagement (replying to 10 threads per platform). Use this skill whenever the user wants to post content to social media, create social media visuals, schedule posts, engage with followers, grow their audience, reply to threads, or manage any social media activity. Also activate when the user mentions any social platform by name, says 'post this', 'share on social', 'engage', 'reply to threads', 'publish a post about', 'social media blast', 'cross-post this', 'announce on social', 'spread the word', 'promote this on', 'quick post', 'post with video', 'create social content for', 'repost across socials', or references content distribution."
 repository: anton-abyzov/social-media-posting-skill
@@ -266,6 +266,76 @@ Picking the right model up front matters more than tuning the prompt afterwards.
 
 Operational knowledge that sits ABOVE the upstream Postiz CLI skill. The CLI knows how to make calls; this section captures the quirks that bite Anton's posting workflow specifically. Read this before composing any Postiz CLI invocation.
 
+### Twitter / X is always Blotato (never Postiz)
+
+Standing rule from Anton: every X post — single tweet, thread, image, video — goes through Blotato. Postiz's X integration on his self-hosted instance silently errors and is not used.
+
+#### Anton's connected X accounts on Blotato
+
+| Account | Blotato accountId | username |
+|---|---|---|
+| Personal | `18001` | `aabyzov` |
+| Business — Soothbee | (not yet connected — ask Anton to add) | — |
+| Business — EasyChamp | (not yet connected — ask Anton to add) | — |
+| Business — Sketchmate | (not yet connected — ask Anton to add) | — |
+
+If a business X workflow is requested but the account isn't yet in `GET /v2/users/me/accounts`, ask Anton to add it via the Blotato dashboard before posting.
+
+#### Single tweet
+
+```
+POST https://backend.blotato.com/v2/posts
+Header: blotato-api-key: <key>
+Body:
+{
+  "post": {
+    "accountId": "18001",
+    "content": {
+      "text": "Tweet text",
+      "mediaUrls": [],
+      "platform": "twitter"
+    },
+    "target": {"targetType": "twitter"}
+  }
+}
+```
+
+#### Thread (chain of tweets)
+
+Up to 10 additional posts → 11 tweets total (matches X's UI cap nicely).
+
+```json
+{
+  "post": {
+    "accountId": "18001",
+    "content": {
+      "text": "First tweet",
+      "mediaUrls": ["<blotato CDN url>"],
+      "platform": "twitter",
+      "additionalPosts": [
+        {"text": "Second tweet"},
+        {"text": "Third tweet"}
+      ]
+    },
+    "target": {"targetType": "twitter"}
+  }
+}
+```
+
+Each `additionalPosts[]` can have its own `mediaUrls`. Max 20 media items per individual tweet.
+
+#### Media
+
+Same handoff as TikTok: upload to Postiz CDN with `postiz upload` → get public URL → POST `/v2/media` with `{url}` to mirror to Blotato CDN → pass the returned Blotato URL to `mediaUrls`.
+
+#### Scheduling
+
+Add `"scheduledTime": "<ISO 8601 UTC>"` at the root of the body (alongside `post`). Omit for immediate publish.
+
+#### What this obsoletes
+
+The X-specific workarounds in the "Silent failures" subsection below (drop `made_with_ai` flag, slim T1 to ≤280 chars, retry pattern for silent ERROR) are no longer relevant — the Postiz X integration is simply not used. Keep the Postiz X troubleshooting note as a one-line crossref to this section so future readers understand why the workaround disappeared.
+
 ### Anton's self-hosted instance
 
 - **API URL:** `https://postiz.easychamp.com/api`
@@ -278,18 +348,18 @@ When the user says "personal accounts only", restrict to the IDs below. Brand ac
 
 | Platform | Integration ID | Handle / Identifier |
 |----------|---------------|---------------------|
-| X (Anton) | `cmopgzvgv0001ouvvxgzxtvtq` | `@aabyzov` |
+| ~~X (Anton)~~ | DEPRECATED — do not use Postiz for X | use Blotato accountId `18001` (`@aabyzov`) per the "Twitter / X is always Blotato" rule above |
 | LinkedIn (Anton) | `cmopiw0jb0001outahymxmkhv` | — |
 | Instagram (Anton, `instagram-standalone`) | `cmgzh1zr20001pr261ozok9yp` | `aabyzov` |
 | YouTube (Anton AI Power) | `cmgyq88pu0001po4fdvq4fvii` | `@antonabyzov` |
 | Telegram (Anton AI Power) | `cmoqlxmmc0001ou1tcojd5pps` | `@antonaipower` |
 | Discord (EasyChamp server, used for AI news) | `cmoqm1rui0003ou1tklf1p8pf` | channel `#ai-news` id `1472307264898728181` |
 
-### Silent failures: X and Telegram
+### Silent failures: Telegram
 
 When a Postiz post lands in `state: ERROR`, the public API returns `error: null, errorMessage: null`. There is no detail. Workarounds that have worked:
 
-- **X errors:** drop `made_with_ai: true` from `--settings` (sometimes triggers an unexplained error). Keep the first tweet ≤ 280 chars even if Postiz says `maxLength: 4000` (Premium-account length isn't always honored on the integration path). Drop emoji density on T1 if it still fails.
+- **X:** N/A — Postiz X integration is silent-error and DEPRECATED. See "Twitter / X is always Blotato (never Postiz)" at the top of this section. The previous workarounds (drop `made_with_ai`, slim T1 to ≤280 chars, retry pattern) no longer apply because the path is unused.
 - **Telegram errors:** strip Markdown `*bold*` asterisks from the body. Replace with plain text or rely on Telegram's auto-link. The single `*…*` syntax can fail silently. Keep one image attachment max.
 
 ### No `posts:update` — delete + recreate to change schedule
@@ -1840,6 +1910,12 @@ When you need deeper strategy, invoke the relevant skill:
 ---
 
 ## Changelog
+
+### 1.2.2 — 2026-05-08
+- NEW non-negotiable rule: "Twitter / X is always Blotato (never Postiz)". Postiz X integration silently errors on Anton's instance and is not used.
+- Added Blotato X publishing patterns: single tweet, thread (additionalPosts up to 10), media handoff, scheduling.
+- Recorded Anton's connected Blotato X accounts: personal aabyzov = id 18001. Business slots (Soothbee/EasyChamp/Sketchmate) pending connection.
+- Deprecated the X-specific Postiz workarounds in the Postiz Operational Gotchas section (kept as crossref for context).
 
 ### 1.2.1 — 2026-05-07
 - Added "Postiz Operational Gotchas" section: self-hosted Hetzner instance details, personal vs brand integration ID table, silent-failure workarounds for X (drop made_with_ai flag) and Telegram (strip Markdown asterisks), no-update-API delete+recreate pattern, Discord channel discovery, already-published deletion limitation, calendar UI sidebar-filter caveat, TikTok-via-Blotato carousel + video patterns.
